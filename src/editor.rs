@@ -1,8 +1,6 @@
-use crossterm::event::Event;
-use crossterm::event::{read, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
-use crossterm::execute;
-use crossterm::terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType};
-use std::io::stdout;
+use crossterm::event::{read, Event, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
+mod terminal;
+use terminal::Terminal;
 
 pub struct Editor {
     should_quit: bool,
@@ -10,39 +8,26 @@ pub struct Editor {
 
 
 impl Editor {
-    pub fn default() -> Self {
-        Editor { should_quit: false }
+    pub const  fn default() -> Self {
+        Self { should_quit: false }
     }
 
     pub fn run(&mut self) {
-        Self::intialize().unwrap();
+        Terminal::intialize().unwrap();
         let result = self.repl();
-        Self::terminate().unwrap();
+        Terminal::terminate().unwrap();
         result.unwrap();
     }
 
-    fn intialize() -> Result<(), std::io::Error> {
-        enable_raw_mode()?;
-        Self::clear_screen()
-    }
-
-    fn terminate() -> Result<(), std::io::Error> {
-        disable_raw_mode()
-    }
-
-    fn clear_screen() -> Result<(), std::io::Error> {
-        let mut stdout = stdout();
-        execute!(stdout, Clear(ClearType::All))
-    }
 
     fn repl(&mut self) -> Result<(), std::io::Error> {
         loop {
-            let event = read()?;
-            self.evaluate_event(&event);
             self.refresh_screen()?;
             if self.should_quit {
                 break;
             }
+            let event = read()?;
+            self.evaluate_event(&event);
         }
         Ok(())
     }
@@ -62,8 +47,22 @@ impl Editor {
 
     fn refresh_screen(&self) -> Result<(), std::io::Error> {
         if self.should_quit {
-            Self::clear_screen()?;
-            print!("Good Bye!\r");
+            Terminal::clear_screen()?;
+            print!("Good Bye!\r\n");
+        } else {
+            Self::draw_rows()?;
+            Terminal::move_cursor_to(0,0)?;
+        }
+        Ok(())
+    }
+
+    fn draw_rows() -> Result<(), std::io::Error> {
+        let size = Terminal::size()?;
+        let row_size = size.1;
+        for i in 0..row_size {
+            // execute!(stdout(), MoveTo(0, i))?;
+            Terminal::move_cursor_to(0, i)?;
+            print!("~");
         }
         Ok(())
     }
