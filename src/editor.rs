@@ -53,6 +53,7 @@ impl Editor {
             Terminal::print("Good Bye!\r\n")?;
         } else {
             Self::draw_rows()?;
+            Self::welcome()?;
             Terminal::move_cursor_to(Position { x:0, y:0 })?;
         }
         Terminal::show_cursor()?;
@@ -70,6 +71,16 @@ impl Editor {
                 Terminal::print("\r\n")?;
             }
         }
+        Ok(())
+    }
+
+    fn welcome() -> Result<(), Error> {
+        let Size { width, height } = Terminal::size()?;
+        let message = "Welcome to Quik v0.0";
+        let y = height/3;
+        let x = (width - (message.len() as u16)) / 2;
+        Terminal::move_cursor_to(Position{x,y})?;
+        Terminal::print(message)?;
         Ok(())
     }
 
