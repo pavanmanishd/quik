@@ -1,7 +1,7 @@
-use std::io::stdout;
-use crossterm::{cursor::{Hide, Show}, event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers}, queue, style::Print};
+use std::io::Error;
+use crossterm::event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers};
 mod terminal;
-use terminal::Terminal;
+use terminal::{Terminal,Size,Position};
 
 pub struct Editor {
     should_quit: bool,
@@ -21,7 +21,7 @@ impl Editor {
     }
 
 
-    fn repl(&mut self) -> Result<(), std::io::Error> {
+    fn repl(&mut self) -> Result<(), Error> {
         loop {
             self.refresh_screen()?;
             if self.should_quit {
@@ -46,29 +46,29 @@ impl Editor {
         }
     }
 
-    fn refresh_screen(&self) -> Result<(), std::io::Error> {
-        queue!(stdout(), Hide)?;
+    fn refresh_screen(&self) -> Result<(), Error> {
+        Terminal::hide_cursor()?;
         if self.should_quit {
             Terminal::clear_screen()?;
-            print!("Good Bye!\r\n");
+            Terminal::print("Good Bye!\r\n")?;
         } else {
             Self::draw_rows()?;
-            Terminal::move_cursor_to(0,0)?;
+            Terminal::move_cursor_to(Position { x:0, y:0 })?;
         }
-        queue!(stdout(), Show)?;
-        Terminal::flush()?;
+        Terminal::show_cursor()?;
+        Terminal::execute()?;
         Ok(())
     }
 
-    fn draw_rows() -> Result<(), std::io::Error> {
-        let size = Terminal::size()?;
-        let row_size = size.1;
-        for i in 0..row_size {
-            Terminal::move_cursor_to(0, i)?;
-            Terminal::clear_row()?;
-            // print!("~");
-            // execute!(stdout(), Print("~"))?;
-            queue!(stdout(), Print("~"))?;
+    fn draw_rows() -> Result<(), Error> {
+        let Size{height, ..} = Terminal::size()?;
+        for i in 0..height {
+            // Terminal::move_cursor_to(Position { x:0, y:i })?;
+            Terminal::clear_line()?;
+            Terminal::print("~")?;
+            if i+1 < height {
+                Terminal::print("\r\n")?;
+            }
         }
         Ok(())
     }
