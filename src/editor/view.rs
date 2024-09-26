@@ -1,5 +1,6 @@
 use crate::editor::terminal::{Size,Terminal,Position};
 use std::io::{Error,ErrorKind};
+use std::cmp::min;
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod buffer;
@@ -12,22 +13,31 @@ pub struct View {
 
 impl View {
     pub fn render(&self) -> Result<(), Error> {
-        let Size{height, ..} = Terminal::size()?;
-        for i in 0..height {
-            // Terminal::move_cursor_to(Position { x:0, y:i })?;
+        let Size { height, width } = Terminal::size()?;
+        
+        for row in 0..height {
             Terminal::clear_line()?;
-            if let Some(line) = self.buffer.lines.get(i) {
-                Terminal::print(line)?;
+    
+            if let Some(buffer_line) = self.buffer.lines.get(row) {
+                let display_length = min(buffer_line.len(), width);
+                let visible_slice = buffer_line.get(0..display_length);
+                
+                if let Some(line_segment) = visible_slice {
+                    Terminal::print(line_segment)?;
+                }
                 Terminal::print("\r\n")?;
                 continue;
             }
+    
             Terminal::print("~")?;
-            if i+1 < height {
+            
+            if row + 1 < height {
                 Terminal::print("\r\n")?;
             }
         }
         Ok(())
     }
+    
 
     pub fn load(&mut self, file_path: Option<&String>) -> Result<(), Error> {
         if let Some(path) = file_path {
