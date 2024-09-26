@@ -77,11 +77,14 @@ impl Editor {
     fn welcome() -> Result<(), Error> {
         let Size { width, height } = Terminal::size()?;
         let message = "Welcome to Quik v0.0";
-        let y = height/3;
-        let x = (width - (message.len() as u16)) / 2;
-        Terminal::move_cursor_to(Position{x,y})?;
+        let y = height / 3;
+        
+        // Use saturating_sub to prevent underflow
+        let x = width.saturating_sub(message.len() as u16) / 2;
+        
+        Terminal::move_cursor_to(Position { x, y })?;
         Terminal::print(message)?;
         Ok(())
-    }
+    }    
 
 }
