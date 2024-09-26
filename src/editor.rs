@@ -1,5 +1,5 @@
 use std::{cmp::min, io::Error};
-use crossterm::event::{read, Event::{self, Key}, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{read, Event::{self, Key, Resize}, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 mod terminal;
 use terminal::{Terminal,Size,Position};
 mod view;
@@ -105,6 +105,8 @@ impl Editor {
                 // TODO : set this to true for other chars self.view.needs_redraw = true
                 _ => (),
             }
+        } else if let Resize(_col, _row) = event {
+            self.view.needs_redraw = true;
         }
         Ok(())
     }
