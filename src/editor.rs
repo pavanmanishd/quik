@@ -1,4 +1,5 @@
-use crossterm::event::{read, Event, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
+use std::io::stdout;
+use crossterm::{cursor::{Hide, Show}, event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers}, execute, style::Print};
 mod terminal;
 use terminal::Terminal;
 
@@ -46,6 +47,7 @@ impl Editor {
     }
 
     fn refresh_screen(&self) -> Result<(), std::io::Error> {
+        execute!(stdout(), Hide)?;
         if self.should_quit {
             Terminal::clear_screen()?;
             print!("Good Bye!\r\n");
@@ -53,6 +55,7 @@ impl Editor {
             Self::draw_rows()?;
             Terminal::move_cursor_to(0,0)?;
         }
+        execute!(stdout(), Show)?;
         Ok(())
     }
 
@@ -60,9 +63,10 @@ impl Editor {
         let size = Terminal::size()?;
         let row_size = size.1;
         for i in 0..row_size {
-            // execute!(stdout(), MoveTo(0, i))?;
             Terminal::move_cursor_to(0, i)?;
-            print!("~");
+            Terminal::clear_row()?;
+            // print!("~");
+            execute!(stdout(), Print("~"))?;
         }
         Ok(())
     }
