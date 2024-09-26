@@ -18,22 +18,23 @@ impl View {
         if self.needs_redraw {
             for row in 0..height {
                 Terminal::clear_line()?;
-                
+                if height <= 0 {
+                    return Ok(());
+                }
                 if let Some(buffer_line) = self.buffer.lines.get(row) {
                     let display_length = min(buffer_line.len(), width);
-                    let visible_slice = buffer_line.get(0..display_length);
                     
-                    if let Some(line_segment) = visible_slice {
-                        Terminal::print(line_segment)?;
+                    if let Some(line_segment) = buffer_line.get(0..display_length) {
+                        Terminal::print(line_segment)?; // Print the slice of the line
                     }
+                    
                     Terminal::print("\r\n")?;
-                    continue;
-                }
-                
-                Terminal::print("~")?;
-                
-                if row + 1 < height {
-                    Terminal::print("\r\n")?;
+                } else {
+                    Terminal::print("~")?;
+                    
+                    if row + 1 < height {
+                        Terminal::print("\r\n")?;
+                    }
                 }
             }
         }
@@ -55,12 +56,12 @@ impl View {
         let Size { width, height } = Terminal::size()?;
         let message = format!("{NAME} editor -- version {VERSION}");
         let y = height / 3;
-        
-        // Use saturating_sub to prevent underflow
-        let x = width.saturating_sub(message.len()) / 2;
-        
+    
+        // Wrapping add for the x position in case of overflow
+        let x = width.wrapping_sub(message.len()) / 2;
+    
         Terminal::move_cursor_to(Position { x, y })?;
         Terminal::print(&message)?;
         Ok(())
-    }   
+    }    
 }
