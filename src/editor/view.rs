@@ -8,33 +8,36 @@ use buffer::Buffer;
 
 #[derive(Default)]
 pub struct View {
-    buffer: Buffer
+    buffer: Buffer,
+    pub needs_redraw: bool
 }
 
 impl View {
-    pub fn render(&self) -> Result<(), Error> {
+    pub fn render(&mut self) -> Result<(), Error> {
         let Size { height, width } = Terminal::size()?;
-        
-        for row in 0..height {
-            Terminal::clear_line()?;
-    
-            if let Some(buffer_line) = self.buffer.lines.get(row) {
-                let display_length = min(buffer_line.len(), width);
-                let visible_slice = buffer_line.get(0..display_length);
+        if self.needs_redraw {
+            for row in 0..height {
+                Terminal::clear_line()?;
                 
-                if let Some(line_segment) = visible_slice {
-                    Terminal::print(line_segment)?;
+                if let Some(buffer_line) = self.buffer.lines.get(row) {
+                    let display_length = min(buffer_line.len(), width);
+                    let visible_slice = buffer_line.get(0..display_length);
+                    
+                    if let Some(line_segment) = visible_slice {
+                        Terminal::print(line_segment)?;
+                    }
+                    Terminal::print("\r\n")?;
+                    continue;
                 }
-                Terminal::print("\r\n")?;
-                continue;
-            }
-    
-            Terminal::print("~")?;
-            
-            if row + 1 < height {
-                Terminal::print("\r\n")?;
+                
+                Terminal::print("~")?;
+                
+                if row + 1 < height {
+                    Terminal::print("\r\n")?;
+                }
             }
         }
+        self.needs_redraw = false;
         Ok(())
     }
     

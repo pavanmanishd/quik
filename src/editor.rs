@@ -38,6 +38,7 @@ impl Editor {
 
 
     fn repl(&mut self) -> Result<(), Error> {
+        self.view.needs_redraw = true;
         loop {
             self.refresh_screen()?;
             if self.should_quit {
@@ -101,13 +102,14 @@ impl Editor {
                 | KeyCode::Home => {
                     self.move_point(*code)?;
                 },
+                // TODO : set this to true for other chars self.view.needs_redraw = true
                 _ => (),
             }
         }
         Ok(())
     }
 
-    fn refresh_screen(&self) -> Result<(), Error> {
+    fn refresh_screen(&mut self) -> Result<(), Error> {
         Terminal::hide_cursor()?;
         Terminal::move_cursor_to(Position::default())?;
         if self.should_quit {
