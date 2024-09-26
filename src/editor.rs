@@ -9,7 +9,8 @@ use view::View;
 #[derive(Default)]
 pub struct Editor {
     should_quit: bool,
-    location: Location
+    location: Location,
+    view: View
 }
 
 #[derive(Copy,Clone,Default)]
@@ -106,7 +107,7 @@ impl Editor {
             Terminal::print("Good Bye!\r\n")?;
         } else {
             // Self::draw_rows()?;
-            View::render()?;
+            self.view.render()?;
             Terminal::move_cursor_to(Position { x: self.location.x, y: self.location.y})?;
         }
         Terminal::show_cursor()?;
