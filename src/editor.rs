@@ -1,5 +1,5 @@
 use std::io::stdout;
-use crossterm::{cursor::{Hide, Show}, event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers}, execute, style::Print};
+use crossterm::{cursor::{Hide, Show}, event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers}, queue, style::Print};
 mod terminal;
 use terminal::Terminal;
 
@@ -47,7 +47,7 @@ impl Editor {
     }
 
     fn refresh_screen(&self) -> Result<(), std::io::Error> {
-        execute!(stdout(), Hide)?;
+        queue!(stdout(), Hide)?;
         if self.should_quit {
             Terminal::clear_screen()?;
             print!("Good Bye!\r\n");
@@ -55,7 +55,8 @@ impl Editor {
             Self::draw_rows()?;
             Terminal::move_cursor_to(0,0)?;
         }
-        execute!(stdout(), Show)?;
+        queue!(stdout(), Show)?;
+        Terminal::flush()?;
         Ok(())
     }
 
@@ -66,7 +67,8 @@ impl Editor {
             Terminal::move_cursor_to(0, i)?;
             Terminal::clear_row()?;
             // print!("~");
-            execute!(stdout(), Print("~"))?;
+            // execute!(stdout(), Print("~"))?;
+            queue!(stdout(), Print("~"))?;
         }
         Ok(())
     }
