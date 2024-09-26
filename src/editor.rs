@@ -1,5 +1,5 @@
 use std::io::Error;
-use crossterm::event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers};
+use crossterm::event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyEventKind, KeyModifiers};
 mod terminal;
 use terminal::{Terminal,Size,Position};
 
@@ -35,7 +35,7 @@ impl Editor {
 
     fn evaluate_event(&mut self, event: &Event) {
         if let Key(KeyEvent {
-            code, modifiers, ..
+            code, modifiers, kind: KeyEventKind::Press, ..
         }) = event {
             match code {
                 Char('q') if *modifiers == KeyModifiers::CONTROL => {
@@ -54,7 +54,7 @@ impl Editor {
         } else {
             Self::draw_rows()?;
             Self::welcome()?;
-            Terminal::move_cursor_to(Position { x:0, y:0 })?;
+            Terminal::move_cursor_to(Position { x: 0, y: 0})?;
         }
         Terminal::show_cursor()?;
         Terminal::execute()?;
