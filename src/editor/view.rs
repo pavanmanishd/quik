@@ -1,5 +1,5 @@
 use crate::editor::terminal::{Size,Terminal,Position};
-use std::io::Error;
+use std::io::{Error,ErrorKind};
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod buffer;
@@ -26,11 +26,19 @@ impl View {
                 Terminal::print("\r\n")?;
             }
         }
-        Self::welcome()?;
         Ok(())
     }
 
-    fn welcome() -> Result<(), Error> {
+    pub fn load(&mut self, file_path: Option<&String>) -> Result<(), Error> {
+        if let Some(path) = file_path {
+            self.buffer.load(path)?;
+        } else {
+            return Err(Error::new(ErrorKind::NotFound, "No file path provided"));
+        }
+        Ok(())
+    }
+
+    pub fn welcome() -> Result<(), Error> {
         let Size { width, height } = Terminal::size()?;
         let message = format!("{NAME} editor -- version {VERSION}");
         let y = height / 3;

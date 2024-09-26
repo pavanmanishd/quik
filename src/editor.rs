@@ -9,6 +9,7 @@ use view::View;
 #[derive(Default)]
 pub struct Editor {
     should_quit: bool,
+    is_default: bool,
     location: Location,
     view: View
 }
@@ -23,6 +24,13 @@ pub struct Location {
 impl Editor {
     pub fn run(&mut self) {
         Terminal::intialize().unwrap();
+        let args: Vec<String> = std::env::args().collect();
+        let file_path = args.get(1);
+        let status: Result<(), Error> = self.view.load(file_path);
+        match status {
+            Ok(()) => (),
+            Err(_err) => self.is_default = true,
+        }
         let result = self.repl();
         Terminal::terminate().unwrap();
         result.unwrap();
@@ -106,8 +114,10 @@ impl Editor {
             Terminal::clear_screen()?;
             Terminal::print("Good Bye!\r\n")?;
         } else {
-            // Self::draw_rows()?;
             self.view.render()?;
+            if self.is_default {
+                View::welcome()?;
+            }
             Terminal::move_cursor_to(Position { x: self.location.x, y: self.location.y})?;
         }
         Terminal::show_cursor()?;
