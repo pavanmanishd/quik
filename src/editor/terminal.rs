@@ -1,3 +1,4 @@
+use unicode_segmentation::UnicodeSegmentation;
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::style::Print;
 use crossterm::terminal::{

@@ -2,6 +2,7 @@ use super::{
     editorcommand::{Direction, EditorCommand},
     terminal::{Position, Size, Terminal},
 };
+use std::cmp::min;
 mod buffer;
 use buffer::Buffer;
 mod location;
@@ -63,36 +64,53 @@ impl View {
     }
     fn move_text_location(&mut self, direction: &Direction) {
         let Location { mut x, mut y } = self.location;
-        let Size { height, width } = self.size;
+        let Size { height, .. } = self.size;
+    
+        // Helper to get the max valid x based on line length
+        let get_x = |y: usize| -> usize {
+            self.buffer
+                .lines
+                .get(y)
+                .map_or(0, |line| min(line.len(), x))
+        };
+    
         match direction {
             Direction::Up => {
                 y = y.saturating_sub(1);
+                x = get_x(y);
             }
             Direction::Down => {
-                y = y.saturating_add(1);
+                y = min(y.saturating_add(1), self.buffer.lines.len());
+                x = get_x(y);
             }
             Direction::Left => {
                 x = x.saturating_sub(1);
             }
             Direction::Right => {
-                x = x.saturating_add(1);
+                if let Some(line) = self.buffer.lines.get(y) {
+                    x = min(x.saturating_add(1), line.len());
+                }
             }
             Direction::PageUp => {
-                y = 0;
+                y = self.scroll_offset.y;
+                x = get_x(y);
             }
             Direction::PageDown => {
-                y = height.saturating_sub(1);
+                y = min(self.scroll_offset.y + height.saturating_sub(1), self.buffer.lines.len());
+                x = get_x(y);
             }
             Direction::Home => {
                 x = 0;
             }
             Direction::End => {
-                x = width.saturating_sub(1);
+                x = self.buffer.lines.get(y).map_or(0, |line| line.len());
             }
         }
+    
         self.location = Location { x, y };
         self.scroll_location_into_view();
     }
+    
 
     fn resize(&mut self, to: Size) {
         self.size = to;
