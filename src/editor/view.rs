@@ -1,67 +1,89 @@
-use crate::editor::terminal::{Size,Terminal,Position};
-use std::io::{Error,ErrorKind};
-use std::cmp::min;
+use crate::editor::terminal::{Size,Terminal};
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod buffer;
 use buffer::Buffer;
 
-#[derive(Default)]
 pub struct View {
     buffer: Buffer,
-    pub needs_redraw: bool
+    needs_redraw: bool,
+    size: Size
 }
 
 impl View {
-    pub fn render(&mut self) -> Result<(), Error> {
-        let Size { height, width } = Terminal::size()?;
-        if self.needs_redraw {
-            if height <= 1 {
-                return Ok(());
-            }
-            for row in 0..height-1 {
-                Terminal::clear_line()?;
-                if let Some(buffer_line) = self.buffer.lines.get(row) {
-                    let display_length = min(buffer_line.len(), width);
-                    
-                    if let Some(line_segment) = buffer_line.get(0..display_length) {
-                        Terminal::print(line_segment)?; // Print the slice of the line
-                    }
-                    
-                    Terminal::print("\r\n")?;
+    pub fn resize(&mut self, to:Size) {
+        self.size = to;
+        self.needs_redraw = true;
+    }
+
+    fn render_line(at: usize, line_text: &str) {
+        let result = Terminal::print_row(at, line_text);
+        debug_assert!(result.is_ok(), "Failed to render line");
+    }
+
+    pub fn render(&mut self) {
+        if !self.needs_redraw {
+            return;
+        }
+        let Size { height, width } = self.size;
+        if height == 0 || width == 0 {
+            return;
+        }
+
+        #[allow(clippy::integer_division)]
+        let vertical_center = height/3;
+
+        for row in 0..height {
+            if let Some(buffer_line) = self.buffer.lines.get(row) {
+                let truncated_line = if buffer_line.len() >= width {
+                    &buffer_line[0..width]
                 } else {
-                    Terminal::print("~")?;
-                    
-                    if row + 1 < height {
-                        Terminal::print("\r\n")?;
-                    }
-                }
+                    buffer_line
+                };
+                Self::render_line(row, truncated_line);
+            } else if row == vertical_center && self.buffer.is_empty() {
+                Self::render_line(row, &Self::build_welcome_message(width));
+            } else {
+                Self::render_line(row, "~");
             }
         }
         self.needs_redraw = false;
-        Ok(())
     }
     
-
-    pub fn load(&mut self, file_path: Option<&String>) -> Result<(), Error> {
-        if let Some(path) = file_path {
-            self.buffer.load(path)?;
-        } else {
-            return Err(Error::new(ErrorKind::NotFound, "No file path provided"));
+    pub fn build_welcome_message(width: usize) -> String {
+        if width == 0 {
+            return " ".to_string();
         }
-        Ok(())
+        let message = format!("{NAME} editor -- version {VERSION}");
+        let len = message.len();
+        if width <= len {
+            return "~".to_string();
+        }
+
+        #[allow(clippy::integer_division)]
+        let padding = (width.saturating_sub(len).saturating_sub(1)) /2;
+        
+        let mut full_message = format!("~{}{}"," ".repeat(padding),message);
+        full_message.truncate(width);
+        full_message
     }
 
-    pub fn welcome() -> Result<(), Error> {
-        let Size { width, height } = Terminal::size()?;
-        let message = format!("{NAME} editor -- version {VERSION}");
-        let y = height / 3;
-    
-        // Wrapping add for the x position in case of overflow
-        let x = width.wrapping_sub(message.len()) / 2;
-    
-        Terminal::move_cursor_to(Position { x, y })?;
-        Terminal::print(&message)?;
-        Ok(())
-    }    
+    pub fn load(&mut self, file_path: &str) {
+        if let Ok(buffer) = Buffer::load(file_path) {
+            self.buffer = buffer;
+            self.needs_redraw = true;
+        }        
+    }
+
+}
+
+
+impl Default for View {
+    fn default() -> Self {
+        Self { 
+            buffer: Buffer::default(), 
+            needs_redraw: true, 
+            size: Terminal::size().unwrap_or_default(), 
+        }
+    }
 }

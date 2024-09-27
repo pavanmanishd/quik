@@ -2,11 +2,10 @@ use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::style::Print;
 use std::io::{stdout, Error, Write};
 use crossterm::{queue, Command};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
 
-pub struct Terminal {}
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct Size {
     pub width: usize,
     pub height: usize
@@ -18,8 +17,12 @@ pub struct Position {
     pub y: usize
 }
 
+pub struct Terminal;
+
 impl Terminal {
     pub fn terminate() -> Result<(), Error> {
+        Self::leave_alternate_screen()?;
+        Self::show_cursor()?;
         Self::execute()?;
         disable_raw_mode()?;
         Ok(())
@@ -27,8 +30,8 @@ impl Terminal {
 
     pub fn intialize() -> Result<(), Error> {
         enable_raw_mode()?;
+        Self::enter_alternate_screen()?;
         Self::clear_screen()?;
-        Self::move_cursor_to(Position { x:0, y:0 })?;
         Self::execute()?;
         Ok(())
     }
@@ -48,9 +51,26 @@ impl Terminal {
         Ok(())
     }
 
+    pub fn enter_alternate_screen() -> Result<(), Error> {
+        Self::queue_command(EnterAlternateScreen)?;
+        Ok(())
+    }
+
+    pub fn leave_alternate_screen() -> Result<(), Error> {
+        Self::queue_command(LeaveAlternateScreen)?;
+        Ok(())
+    }
+
     pub fn size() -> Result<Size, Error> {
-        let (width, height) = size()?;
-        Ok(Size {width: width as usize,height: height as usize})
+        let (width_u16, height_u16) = size()?;
+        
+        #[allow(clippy::as_conversions)]
+        let height = height_u16 as usize;
+
+        #[allow(clippy::as_conversions)]
+        let width = width_u16 as usize;
+
+        Ok(Size {width, height})
     }
 
     pub fn hide_cursor() -> Result<(), Error> {
@@ -65,6 +85,13 @@ impl Terminal {
 
     pub fn print(data: &str) -> Result<(), Error> {
         Self::queue_command(Print(data))?;
+        Ok(())
+    }
+
+    pub fn print_row(row: usize, line_text: &str) -> Result<(), Error> {
+        Self::move_cursor_to(Position { x: 0, y: row })?;
+        Self::clear_line()?;
+        Self::print(line_text)?;
         Ok(())
     }
 

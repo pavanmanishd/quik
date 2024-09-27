@@ -1,18 +1,9 @@
-use std::{cmp::min, io::Error};
+use std::{cmp::min, io::Error, panic::{set_hook, take_hook},env};
 use crossterm::event::{read, Event::{self, Key, Resize}, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 mod terminal;
 use terminal::{Terminal,Size,Position};
 mod view;
 use view::View;
-
-
-#[derive(Default)]
-pub struct Editor {
-    should_quit: bool,
-    is_default: bool,
-    location: Location,
-    view: View
-}
 
 #[derive(Copy,Clone,Default)]
 pub struct Location {
@@ -20,39 +11,53 @@ pub struct Location {
     pub y: usize
 }
 
+pub struct Editor {
+    should_quit: bool,
+    location: Location,
+    view: View
+}
 
 impl Editor {
-    pub fn run(&mut self) {
-        Terminal::intialize().unwrap();
-        let args: Vec<String> = std::env::args().collect();
-        let file_path = args.get(1);
-        let status: Result<(), Error> = self.view.load(file_path);
-        match status {
-            Ok(()) => (),
-            Err(_err) => self.is_default = true,
+    pub fn new() -> Result<Self, Error> {
+        let current_hook = take_hook();
+        set_hook(Box::new(move | panic_info | {
+            let _ = Terminal::terminate();
+            current_hook(panic_info);
+        }));
+        Terminal::intialize()?;
+        let mut view = View::default();
+        let args: Vec<String> = env::args().collect();
+        if let Some(file_path) = args.get(1) {
+            view.load(file_path);
         }
-        let result = self.repl();
-        Terminal::terminate().unwrap();
-        result.unwrap();
+
+        Ok(Self {
+            should_quit: false,
+            location: Location::default(),
+            view,
+        })
     }
-
-
-    fn repl(&mut self) -> Result<(), Error> {
-        self.view.needs_redraw = true;
+    pub fn run(&mut self) {
         loop {
-            self.refresh_screen()?;
+            self.refresh_screen();
             if self.should_quit {
                 break;
             }
-            let event = read()?;
-            self.evaluate_event(&event)?;
+            match read() {
+                Ok(event) => self.evaluate_event(event),
+                Err(err) => {
+                    #[cfg(debug_assertions)]
+                    {
+                        panic!("Could not read event: {err:?}");
+                    }
+                }
+            }
         }
-        Ok(())
     }
 
-    fn move_point(&mut self, key_code: KeyCode) -> Result<(), Error> {
+    fn move_point(&mut self, key_code: KeyCode) {
         let Location { mut x, mut y } = self.location;
-        let Size { width, height } = Terminal::size()?;
+        let Size { width, height } = Terminal::size().unwrap_or_default();
         match key_code {
             KeyCode::Up => {
                 y = y.saturating_sub(1);
@@ -81,52 +86,60 @@ impl Editor {
             _ => (),
         }
         self.location = Location{x,y};
-        Ok(())
     }
 
-    fn evaluate_event(&mut self, event: &Event) -> Result<(), Error> {
-        if let Key(KeyEvent {
-            code, modifiers, kind: KeyEventKind::Press, ..
-        }) = event {
-            match code {
-                KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
-                    self.should_quit = true;
-                },
-                KeyCode::Up
-                | KeyCode::Down
-                | KeyCode::Left
-                | KeyCode::Right
-                | KeyCode::PageDown
-                | KeyCode::PageUp
-                | KeyCode::End
-                | KeyCode::Home => {
-                    self.move_point(*code)?;
-                },
-                // TODO : set this to true for other chars self.view.needs_redraw = true
-                _ => (),
-            }
-        } else if let Resize(_col, _row) = event {
-            self.view.needs_redraw = true;
+
+    fn evaluate_event(&mut self, event: Event){
+        match event {
+            Key(KeyEvent {
+                code, modifiers, kind: KeyEventKind::Press, ..
+            }) => {
+                match (code,modifiers) {
+                    (KeyCode::Char('q') , KeyModifiers::CONTROL) => {
+                        self.should_quit = true;
+                    },
+                    (KeyCode::Up
+                    | KeyCode::Down
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::PageDown
+                    | KeyCode::PageUp
+                    | KeyCode::End
+                    | KeyCode::Home, _ ) => {
+                        self.move_point(code);
+                    },
+                    _ => {},
+                }
+            },
+            Resize(width_u16, height_u16) => {
+                #[allow(clippy::as_conversions)]
+                let height = height_u16 as usize;
+                #[allow(clippy::as_conversions)]
+                let width = width_u16 as usize;
+                self.view.resize(Size {width,height});
+            },
+            _ => {}
         }
-        Ok(())
     }
 
-    fn refresh_screen(&mut self) -> Result<(), Error> {
-        Terminal::hide_cursor()?;
-        Terminal::move_cursor_to(Position::default())?;
-        if self.should_quit {
-            Terminal::clear_screen()?;
-            Terminal::print("Good Bye!\r\n")?;
-        } else {
-            self.view.render()?;
-            if self.is_default {
-                View::welcome()?;
-            }
-            Terminal::move_cursor_to(Position { x: self.location.x, y: self.location.y})?;
-        }
-        Terminal::show_cursor()?;
-        Terminal::execute()?;
-        Ok(())
+    fn refresh_screen(&mut self) {
+        let _ = Terminal::hide_cursor();
+        self.view.render();
+        let _ = Terminal::move_cursor_to(Position {
+            x: self.location.x,
+            y: self.location.y,
+        });
+        let _ = Terminal::show_cursor();
+        let _ = Terminal::execute();
     }  
+}
 
+
+impl Drop for Editor {
+    fn drop(&mut self) {
+        let _ = Terminal::terminate();
+        if self.should_quit {
+            let _ = Terminal::print("Good Bye.\r\n");
+        }
+    }
 }
