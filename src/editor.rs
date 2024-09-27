@@ -1,39 +1,37 @@
-use std::{cmp::min, io::Error, panic::{set_hook, take_hook},env};
-use crossterm::event::{read, Event::{self, Key, Resize}, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{read, Event, KeyEvent, KeyEventKind};
+use std::{
+    env,
+    io::Error,
+    panic::{set_hook, take_hook},
+};
+mod editorcommand;
 mod terminal;
-use terminal::{Terminal,Size,Position};
 mod view;
+use terminal::Terminal;
 use view::View;
 
-#[derive(Copy,Clone,Default)]
-pub struct Location {
-    pub x: usize,
-    pub y: usize
-}
+use editorcommand::EditorCommand;
 
 pub struct Editor {
     should_quit: bool,
-    location: Location,
-    view: View
+    view: View,
 }
 
 impl Editor {
     pub fn new() -> Result<Self, Error> {
         let current_hook = take_hook();
-        set_hook(Box::new(move | panic_info | {
+        set_hook(Box::new(move |panic_info| {
             let _ = Terminal::terminate();
             current_hook(panic_info);
         }));
-        Terminal::intialize()?;
+        Terminal::initialize()?;
         let mut view = View::default();
         let args: Vec<String> = env::args().collect();
-        if let Some(file_path) = args.get(1) {
-            view.load(file_path);
+        if let Some(file_name) = args.get(1) {
+            view.load(file_name);
         }
-
         Ok(Self {
             should_quit: false,
-            location: Location::default(),
             view,
         })
     }
@@ -55,91 +53,54 @@ impl Editor {
         }
     }
 
-    fn move_point(&mut self, key_code: KeyCode) {
-        let Location { mut x, mut y } = self.location;
-        let Size { width, height } = Terminal::size().unwrap_or_default();
-        match key_code {
-            KeyCode::Up => {
-                y = y.saturating_sub(1);
-            },
-            KeyCode::Down => {
-                y = min(height.saturating_sub(1), y.saturating_add(1));
-            },
-            KeyCode::Left => {
-                x = x.saturating_sub(1);
-            },
-            KeyCode::Right => {
-                x = min(width.saturating_sub(1), x.saturating_add(1));
-            },
-            KeyCode::PageUp => {
-                y = 0;
-            },
-            KeyCode::PageDown => {
-                y = height.saturating_sub(1);
-            },
-            KeyCode::Home => {
-                x = 0;
-            },
-            KeyCode::End => {
-                x = width.saturating_sub(1);
-            },
-            _ => (),
-        }
-        self.location = Location{x,y};
-    }
+    // needless_pass_by_value: Event is not huge, so there is not a
+    // performance overhead in passing by value, and pattern matching in this
+    // function would be needlessly complicated if we pass by reference here.
+    #[allow(clippy::needless_pass_by_value)]
+    fn evaluate_event(&mut self, event: Event) {
+        let should_process = match &event {
+            Event::Key(KeyEvent { kind, .. }) => kind == &KeyEventKind::Press,
+            Event::Resize(_, _) => true,
+            _ => false,
+        };
 
-
-    fn evaluate_event(&mut self, event: Event){
-        match event {
-            Key(KeyEvent {
-                code, modifiers, kind: KeyEventKind::Press, ..
-            }) => {
-                match (code,modifiers) {
-                    (KeyCode::Char('q') , KeyModifiers::CONTROL) => {
+        if should_process {
+            match EditorCommand::try_from(event) {
+                Ok(command) => {
+                    if matches!(command, EditorCommand::Quit) {
                         self.should_quit = true;
-                    },
-                    (KeyCode::Up
-                    | KeyCode::Down
-                    | KeyCode::Left
-                    | KeyCode::Right
-                    | KeyCode::PageDown
-                    | KeyCode::PageUp
-                    | KeyCode::End
-                    | KeyCode::Home, _ ) => {
-                        self.move_point(code);
-                    },
-                    _ => {},
+                    } else {
+                        self.view.handle_command(command);
+                    }
                 }
-            },
-            Resize(width_u16, height_u16) => {
-                #[allow(clippy::as_conversions)]
-                let height = height_u16 as usize;
-                #[allow(clippy::as_conversions)]
-                let width = width_u16 as usize;
-                self.view.resize(Size {width,height});
-            },
-            _ => {}
+                Err(err) => {
+                    #[cfg(debug_assertions)]
+                    {
+                        panic!("Could not handle command: {err}");
+                    }
+                }
+            }
+        } else {
+            #[cfg(debug_assertions)]
+            {
+                // panic!("Received and discarded unsupported or non-press event.");
+            }
         }
     }
-
     fn refresh_screen(&mut self) {
-        let _ = Terminal::hide_cursor();
+        let _ = Terminal::hide_caret();
         self.view.render();
-        let _ = Terminal::move_cursor_to(Position {
-            x: self.location.x,
-            y: self.location.y,
-        });
-        let _ = Terminal::show_cursor();
+        let _ = Terminal::move_caret_to(self.view.get_position());
+        let _ = Terminal::show_caret();
         let _ = Terminal::execute();
-    }  
+    }
 }
-
 
 impl Drop for Editor {
     fn drop(&mut self) {
         let _ = Terminal::terminate();
         if self.should_quit {
-            let _ = Terminal::print("Good Bye.\r\n");
+            let _ = Terminal::print("Goodbye.\r\n");
         }
     }
 }
