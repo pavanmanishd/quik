@@ -16,11 +16,11 @@ impl View {
     pub fn render(&mut self) -> Result<(), Error> {
         let Size { height, width } = Terminal::size()?;
         if self.needs_redraw {
-            for row in 0..height {
+            if height <= 1 {
+                return Ok(());
+            }
+            for row in 0..height-1 {
                 Terminal::clear_line()?;
-                if height <= 0 {
-                    return Ok(());
-                }
                 if let Some(buffer_line) = self.buffer.lines.get(row) {
                     let display_length = min(buffer_line.len(), width);
                     
