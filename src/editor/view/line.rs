@@ -32,15 +32,17 @@ impl Line {
         let fragments = line_str
                                             .graphemes(true)
                                             .map(|grapheme| {
-                                                let unicode_width = grapheme.width();
-                                                let rendered_width = match unicode_width {
-                                                    0 | 1 => GraphemeWidth::Half,
-                                                    _ => GraphemeWidth::Full,
-                                                };
-                                                let replacement = match unicode_width {
-                                                    0 => Some('.'),
-                                                    _ => None,
-                                                };
+                                                let (replacement, rendered_width) = Self::replacement_character(grapheme)
+                                                .map_or_else( || {
+                                                    let unicode_width = grapheme.width();
+                                                    let rendered_width = match unicode_width {
+                                                        0 | 1 => GraphemeWidth::Half,
+                                                        _ => GraphemeWidth::Full,
+                                                    };
+                                                    (None, rendered_width)
+                                                },|replacement| {
+                                                    (Some(replacement), GraphemeWidth::Half)
+                                                });
 
                                                 TextFragment {
                                                     grapheme: grapheme.to_string(),
@@ -51,6 +53,26 @@ impl Line {
                                             .collect();
         Self { fragments }
     }
+
+    fn replacement_character(for_str: &str) -> Option<char> {
+        let width = for_str.width();
+        match for_str {
+            " " => None,
+            "\t" => Some(' '),
+            _ if width > 0 && for_str.trim().is_empty() => Some('␣'),
+            _ if width == 0 => {
+                let mut chars = for_str.chars();
+                if let Some(ch) = chars.next() {
+                    if ch.is_control() && chars.next().is_none() {
+                        return Some('▯');
+                    }
+                }
+                Some('·')
+            },
+            _ => None
+        }
+    } 
+
     pub fn get_visible_graphemes(&self, range: Range<usize>) -> String {
         if range.start >= range.end {
             return String::new();
