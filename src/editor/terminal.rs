@@ -1,4 +1,3 @@
-use unicode_segmentation::UnicodeSegmentation;
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::style::Print;
 use crossterm::terminal::{
@@ -18,6 +17,17 @@ pub struct Position {
     pub col: usize,
     pub row: usize,
 }
+
+impl Position {
+    pub const fn saturating_sub(self,other: Self) -> Self {
+        Self { 
+            col: self.col.saturating_sub(other.col), 
+            row: self.row.saturating_sub(other.row),
+        }
+    }
+}
+
+
 /// Represents the Terminal.
 /// Edge Case for platforms where `usize` < `u16`:
 /// Regardless of the actual size of the Terminal, this representation
