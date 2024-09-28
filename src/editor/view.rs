@@ -56,14 +56,17 @@ impl View {
         let new_len = self.buffer.lines.get(self.text_location.line_index).map_or(0, Line::grapheme_count);
         let grapheme_delta = new_len.saturating_sub(old_len);
         if grapheme_delta > 0 {
-            self.move_right();
+            self.move_text_location(&Direction::Right);
         }
         self.needs_redraw = true;
     } 
 
     fn backspace(&mut self) {
-        self.move_left();
-        self.delete();
+        let Location { grapheme_index, line_index } = self.text_location;
+        if line_index != 0  || grapheme_index != 0 {
+            self.move_text_location(&Direction::Left);
+            self.delete();
+        }
     }
     fn delete(&mut self) {
         self.buffer.delete(self.text_location);
