@@ -45,4 +45,12 @@ impl Buffer {
             }
         }
     }
+    pub fn insert_newline(&mut self, at: Location) {
+        if at.line_index == self.height() {
+            self.lines.push(Line::default());
+        } else if let Some(line) = self.lines.get_mut(at.line_index) {
+            let new = line.split(at.grapheme_index);
+            self.lines.insert(at.line_index.saturating_add(1), new);
+        }
+    }
 }
