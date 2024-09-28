@@ -31,6 +31,7 @@ impl View {
             EditorCommand::Resize(size) => self.resize(size),
             EditorCommand::Move(direction) => self.move_text_location(&direction),
             EditorCommand::Quit => {},
+            EditorCommand::Save => self.save(),
             EditorCommand::Insert(character) => self.insert_char(character),
             EditorCommand::Delete => self.delete(),
             EditorCommand::Backspace => self.delete_backwards(),
@@ -49,6 +50,10 @@ impl View {
         self.size = to;
         self.scroll_text_location_into_view();
         self.needs_redraw = true;
+    }
+
+    fn save(&self) {
+        let _ = self.buffer.save(); //ignore error
     }
 
     fn insert_char(&mut self, character: char) {
