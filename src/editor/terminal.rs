@@ -1,12 +1,13 @@
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::style::{Attribute, Print};
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, size, Clear, ClearType, DisableLineWrap, EnableLineWrap, EnterAlternateScreen, LeaveAlternateScreen, SetTitle
+    disable_raw_mode, enable_raw_mode, size, Clear, ClearType, DisableLineWrap, EnableLineWrap,
+    EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
 };
 use crossterm::{queue, Command};
 use std::io::{stdout, Error, Write};
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct Size {
     pub height: usize,
     pub width: usize,
@@ -108,10 +109,11 @@ impl Terminal {
             ),
         )
     }
-    #[allow(clippy::as_conversions)]
     pub fn size() -> Result<Size, Error> {
         let (width_u16, height_u16) = size()?;
+        #[allow(clippy::as_conversions)]
         let height = height_u16 as usize;
+        #[allow(clippy::as_conversions)]
         let width = width_u16 as usize;
         Ok(Size { height, width })
     }
