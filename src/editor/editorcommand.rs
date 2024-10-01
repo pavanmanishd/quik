@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 
 use super::terminal::Size;
 
+#[derive(Clone, Copy)]
 pub enum Direction {
     PageUp,
     PageDown,
@@ -13,17 +14,18 @@ pub enum Direction {
     Right,
     Down,
 }
+#[derive(Clone, Copy)]
 pub enum EditorCommand {
     Move(Direction),
     Resize(Size),
     Quit,
     Insert(char),
-    Delete,
     Backspace,
+    Delete,
     Enter,
-    Save
+    Save,
 }
-
+// clippy::as_conversions: Will run into problems for rare edge case systems where usize < u16
 #[allow(clippy::as_conversions)]
 impl TryFrom<Event> for EditorCommand {
     type Error = String;
@@ -34,9 +36,9 @@ impl TryFrom<Event> for EditorCommand {
             }) => match (code, modifiers) {
                 (KeyCode::Char('q'), KeyModifiers::CONTROL) => Ok(Self::Quit),
                 (KeyCode::Char('s'), KeyModifiers::CONTROL) => Ok(Self::Save),
-                (KeyCode::Char(character), KeyModifiers::NONE | KeyModifiers::SHIFT) => Ok(Self::Insert(character)),
-                (KeyCode::Backspace, _) => Ok(Self::Backspace),
-                (KeyCode::Delete, _) => Ok(Self::Delete),
+                (KeyCode::Char(character), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+                    Ok(Self::Insert(character))
+                }
                 (KeyCode::Tab, _) => Ok(Self::Insert('\t')),
                 (KeyCode::Enter, _) => Ok(Self::Enter),
                 (KeyCode::Up, _) => Ok(Self::Move(Direction::Up)),
@@ -47,13 +49,14 @@ impl TryFrom<Event> for EditorCommand {
                 (KeyCode::PageUp, _) => Ok(Self::Move(Direction::PageUp)),
                 (KeyCode::Home, _) => Ok(Self::Move(Direction::Home)),
                 (KeyCode::End, _) => Ok(Self::Move(Direction::End)),
+                (KeyCode::Backspace, _) => Ok(Self::Backspace),
+                (KeyCode::Delete, _) => Ok(Self::Delete),
                 _ => Err(format!("Key Code not supported: {code:?}")),
             },
-            Event::Resize(width_u16, height_u16) => {
-                let height = height_u16 as usize;
-                let width = width_u16 as usize;
-                Ok(Self::Resize(Size { height, width }))
-            }
+            Event::Resize(width_u16, height_u16) => Ok(Self::Resize(Size {
+                height: height_u16 as usize,
+                width: width_u16 as usize,
+            })),
             _ => Err(format!("Event not supported: {event:?}")),
         }
     }

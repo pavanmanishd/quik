@@ -1,8 +1,8 @@
+use std::{fmt, ops::Range};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
-use std::{fmt, ops::Range};
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 enum GraphemeWidth {
     Half,
     Full,
@@ -25,7 +25,7 @@ struct TextFragment {
 
 #[derive(Default)]
 pub struct Line {
-    fragments: Vec<TextFragment>
+    fragments: Vec<TextFragment>,
 }
 
 impl Line {
@@ -39,16 +39,17 @@ impl Line {
             .graphemes(true)
             .map(|grapheme| {
                 let (replacement, rendered_width) = Self::replacement_character(grapheme)
-                .map_or_else( || {
-                    let unicode_width = grapheme.width();
-                    let rendered_width = match unicode_width {
-                        0 | 1 => GraphemeWidth::Half,
-                        _ => GraphemeWidth::Full,
-                    };
-                    (None, rendered_width)
-                },|replacement| {
-                    (Some(replacement), GraphemeWidth::Half)
-                });
+                    .map_or_else(
+                        || {
+                            let unicode_width = grapheme.width();
+                            let rendered_width = match unicode_width {
+                                0 | 1 => GraphemeWidth::Half,
+                                _ => GraphemeWidth::Full,
+                            };
+                            (None, rendered_width)
+                        },
+                        |replacement| (Some(replacement), GraphemeWidth::Half),
+                    );
 
                 TextFragment {
                     grapheme: grapheme.to_string(),
@@ -57,7 +58,7 @@ impl Line {
                 }
             })
             .collect()
-    } 
+    }
 
     fn replacement_character(for_str: &str) -> Option<char> {
         let width = for_str.width();
@@ -73,10 +74,10 @@ impl Line {
                     }
                 }
                 Some('·')
-            },
-            _ => None
+            }
+            _ => None,
         }
-    } 
+    }
 
     pub fn get_visible_graphemes(&self, range: Range<usize>) -> String {
         if range.start >= range.end {
@@ -91,6 +92,7 @@ impl Line {
             }
             if fragment_end > range.start {
                 if fragment_end > range.end || current_pos < range.start {
+                    // Clip on the right or left
                     result.push('⋯');
                 } else if let Some(char) = fragment.replacement {
                     result.push(char);
@@ -106,7 +108,6 @@ impl Line {
     pub fn grapheme_count(&self) -> usize {
         self.fragments.len()
     }
-
     pub fn width_until(&self, grapheme_index: usize) -> usize {
         self.fragments
             .iter()
@@ -132,16 +133,17 @@ impl Line {
         }
         self.fragments = Self::str_to_fragments(&result);
     }
-
     pub fn delete(&mut self, at: usize) {
         let mut result = String::new();
-        for(index, fragment) in self.fragments.iter().enumerate() {
+
+        for (index, fragment) in self.fragments.iter().enumerate() {
             if index != at {
                 result.push_str(&fragment.grapheme);
             }
         }
         self.fragments = Self::str_to_fragments(&result);
     }
+
     pub fn append(&mut self, other: &Self) {
         let mut concat = self.to_string();
         concat.push_str(&other.to_string());
@@ -151,19 +153,20 @@ impl Line {
         if at > self.fragments.len() {
             return Self::default();
         }
-        let remainder = self.fragments.split_off(at); // returns [at,len) also the original vector will now be [0,at)
+        let remainder = self.fragments.split_off(at);
         Self {
-            fragments: remainder
+            fragments: remainder,
         }
     }
 }
 
 impl fmt::Display for Line {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let result: String = self.fragments
-                                .iter()
-                                .map(|fragment| fragment.grapheme.clone())
-                                .collect();
-        write!(f, "{result}")
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let result: String = self
+            .fragments
+            .iter()
+            .map(|fragment| fragment.grapheme.clone())
+            .collect();
+        write!(formatter, "{result}")
     }
 }
