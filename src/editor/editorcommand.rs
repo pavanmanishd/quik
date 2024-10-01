@@ -25,7 +25,7 @@ pub enum EditorCommand {
     Enter,
     Save,
 }
-// clippy::as_conversions: Will run into problems for rare edge case systems where usize < u16
+
 #[allow(clippy::as_conversions)]
 impl TryFrom<Event> for EditorCommand {
     type Error = String;

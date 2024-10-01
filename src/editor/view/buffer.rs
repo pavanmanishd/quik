@@ -2,13 +2,15 @@ use std::fs::{read_to_string, File};
 use std::io::Error;
 use std::io::Write;
 
+use crate::editor::fileinfo::FileInfo;
+
 use super::line::Line;
 use super::Location;
 
 #[derive(Default)]
 pub struct Buffer {
     pub lines: Vec<Line>,
-    pub file_name: Option<String>,
+    pub file_info: FileInfo,
     pub dirty: bool,
 }
 
@@ -21,14 +23,14 @@ impl Buffer {
         }
         Ok(Self {
             lines,
-            file_name: Some(file_name.to_string()),
+            file_info: FileInfo::from(file_name),
             dirty: false,
         })
     }
 
     pub fn save(&mut self) -> Result<(), Error> {
-        if let Some(file_name) = &self.file_name {
-            let mut file = File::create(file_name)?;
+        if let Some(path) = &self.file_info.path {
+            let mut file = File::create(path)?;
             for line in &self.lines {
                 writeln!(file, "{line}")?;
             }
@@ -61,12 +63,10 @@ impl Buffer {
                 && self.height() > at.line_index.saturating_add(1)
             {
                 let next_line = self.lines.remove(at.line_index.saturating_add(1));
-                // clippy::indexing_slicing: We checked for existence of this line in the surrounding if statment
                 #[allow(clippy::indexing_slicing)]
                 self.lines[at.line_index].append(&next_line);
                 self.dirty = true;
             } else if at.grapheme_index < line.grapheme_count() {
-                // clippy::indexing_slicing: We checked for existence of this line in the surrounding if statment
                 #[allow(clippy::indexing_slicing)]
                 self.lines[at.line_index].delete(at.grapheme_index);
                 self.dirty = true;

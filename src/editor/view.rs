@@ -5,13 +5,12 @@ use self::line::Line;
 use super::{
     editorcommand::{Direction, EditorCommand},
     terminal::{Position, Size, Terminal},
-    DocumentStatus,
+    DocumentStatus, NAME, VERSION,
 };
 mod buffer;
 use buffer::Buffer;
 mod line;
-const NAME: &str = env!("CARGO_PKG_NAME");
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Copy, Clone, Default)]
 pub struct Location {
     pub grapheme_index: usize,
@@ -21,6 +20,7 @@ pub struct View {
     buffer: Buffer,
     needs_redraw: bool,
     size: Size,
+    margin_bottom: usize,
     text_location: Location,
     scroll_offset: Position,
 }
@@ -35,6 +35,7 @@ impl View {
                 width: terminal_size.width,
                 height: terminal_size.height.saturating_sub(margin_bottom),
             },
+            margin_bottom,
             text_location: Location::default(),
             scroll_offset: Position::default(),
         }
@@ -44,12 +45,11 @@ impl View {
         DocumentStatus {
             total_lines: self.buffer.height(),
             current_line_index: self.text_location.line_index,
-            file_name: self.buffer.file_name.clone(),
+            file_name: format!("{}", self.buffer.file_info),
             is_modified: self.buffer.dirty,
         }
     }
 
-    // region: file i/o
     pub fn load(&mut self, file_name: &str) {
         if let Ok(buffer) = Buffer::load(file_name) {
             self.buffer = buffer;
@@ -61,9 +61,6 @@ impl View {
         let _ = self.buffer.save();
     }
 
-    // endregion
-
-    // region: command handling
     pub fn handle_command(&mut self, command: EditorCommand) {
         match command {
             EditorCommand::Resize(size) => self.resize(size),
@@ -78,12 +75,14 @@ impl View {
     }
 
     fn resize(&mut self, to: Size) {
-        self.size = to;
+        self.size = Size {
+            width: to.width,
+            height: to.height.saturating_sub(self.margin_bottom),
+        };
         self.scroll_text_location_into_view();
         self.needs_redraw = true;
     }
-    // endregion
-    // region: Text editing
+
     fn insert_newline(&mut self) {
         self.buffer.insert_newline(self.text_location);
         self.move_text_location(Direction::Right);
@@ -113,25 +112,20 @@ impl View {
             .map_or(0, Line::grapheme_count);
         let grapheme_delta = new_len.saturating_sub(old_len);
         if grapheme_delta > 0 {
-            //move right for an added grapheme (should be the regular case)
             self.move_text_location(Direction::Right);
         }
         self.needs_redraw = true;
     }
-    // endregion
-
-    // region: Rendering
 
     pub fn render(&mut self) {
-        if !self.needs_redraw {
+        if !self.needs_redraw || self.size.height == 0 {
             return;
         }
         let Size { height, width } = self.size;
         if height == 0 || width == 0 {
             return;
         }
-        // we allow this since we don't care if our welcome message is put _exactly_ in the middle.
-        // it's allowed to be a bit too far up or down
+
         #[allow(clippy::integer_division)]
         let vertical_center = height / 3;
         let top = self.scroll_offset.row;
@@ -155,25 +149,16 @@ impl View {
     }
     fn build_welcome_message(width: usize) -> String {
         if width == 0 {
-            return " ".to_string();
+            return String::new();
         }
         let welcome_message = format!("{NAME} editor -- version {VERSION}");
         let len = welcome_message.len();
-        if width <= len {
+        let remaining_width = width.saturating_sub(1);
+        if remaining_width < len {
             return "~".to_string();
         }
-        // we allow this since we don't care if our welcome message is put _exactly_ in the middle.
-        // it's allowed to be a bit to the left or right.
-        #[allow(clippy::integer_division)]
-        let padding = (width.saturating_sub(len).saturating_sub(1)) / 2;
-
-        let mut full_message = format!("~{}{}", " ".repeat(padding), welcome_message);
-        full_message.truncate(width);
-        full_message
+        format!("{:<1}{:^remaining_width$}", "~", welcome_message)
     }
-    // endregion
-
-    // region: Scrolling
 
     fn scroll_vertically(&mut self, to: usize) {
         let Size { height, .. } = self.size;
@@ -211,9 +196,6 @@ impl View {
         self.scroll_horizontally(col);
     }
 
-    // endregion
-
-    // region: Location and Position Handling
 
     pub fn caret_position(&self) -> Position {
         self.text_location_to_position()
@@ -228,14 +210,9 @@ impl View {
         Position { col, row }
     }
 
-    // endregion
-
-    // region: text location movement
 
     fn move_text_location(&mut self, direction: Direction) {
         let Size { height, .. } = self.size;
-        // This match moves the positon, but does not check for all boundaries.
-        // The final boundarline checking happens after the match statement.
         match direction {
             Direction::Up => self.move_up(1),
             Direction::Down => self.move_down(1),
@@ -257,8 +234,7 @@ impl View {
         self.snap_to_valid_grapheme();
         self.snap_to_valid_line();
     }
-    // clippy::arithmetic_side_effects: This function performs arithmetic calculations
-    // after explicitly checking that the target value will be within bounds.
+
     #[allow(clippy::arithmetic_side_effects)]
     fn move_right(&mut self) {
         let line_width = self
@@ -273,8 +249,7 @@ impl View {
             self.move_down(1);
         }
     }
-    // clippy::arithmetic_side_effects: This function performs arithmetic calculations
-    // after explicitly checking that the target value will be within bounds.
+
     #[allow(clippy::arithmetic_side_effects)]
     fn move_left(&mut self) {
         if self.text_location.grapheme_index > 0 {
@@ -295,8 +270,6 @@ impl View {
             .map_or(0, Line::grapheme_count);
     }
 
-    // Ensures self.location.grapheme_index points to a valid grapheme index by snapping it to the left most grapheme if appropriate.
-    // Doesn't trigger scrolling.
     fn snap_to_valid_grapheme(&mut self) {
         self.text_location.grapheme_index = self
             .buffer
@@ -306,8 +279,7 @@ impl View {
                 min(line.grapheme_count(), self.text_location.grapheme_index)
             });
     }
-    // Ensures self.location.line_index points to a valid line index by snapping it to the bottom most line if appropriate.
-    // Doesn't trigger scrolling.
+
     fn snap_to_valid_line(&mut self) {
         self.text_location.line_index = min(self.text_location.line_index, self.buffer.height());
     }
