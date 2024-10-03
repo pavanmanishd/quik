@@ -14,7 +14,7 @@ impl CommandBar {
     pub fn handle_edit_command(&mut self, command: Edit) {
         match command {
             Edit::Insert(character) => self.value.append_char(character),
-            Edit::Delete | Edit::InsertNewline=> {}
+            Edit::Delete | Edit::InsertNewline => {}
             Edit::DeleteBackward => self.value.delete_last(),
         }
         self.set_needs_redraw(true);
@@ -31,6 +31,11 @@ impl CommandBar {
     }
     pub fn set_prompt(&mut self, prompt: &str) {
         self.prompt = prompt.to_string();
+        self.set_needs_redraw(true);
+    }
+    pub fn clear_value(&mut self) {
+        self.value = Line::default();
+        self.set_needs_redraw(true);
     }
 }
 
