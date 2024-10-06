@@ -19,15 +19,18 @@ pub trait UIComponent {
     // Draw this component if it's visible and in need of redrawing
     fn render(&mut self, origin_row: usize) {
         if self.needs_redraw() {
-            match self.draw(origin_row) {
-                Ok(()) => self.set_needs_redraw(false),
-                Err(err) => {
-                    #[cfg(debug_assertions)]
-                    {
-                        panic!("Could not render component: {err:?}");
-                    }
+            if let Err(err) = self.draw(origin_row) {
+                #[cfg(debug_assertions)]
+                {
+                    panic!("Could not render component: {err:?}");
                 }
-            }
+                #[cfg(not(debug_assertions))]
+                {
+                    let _ = err;
+                }
+            } else {
+                self.set_needs_redraw(false);
+            }      
         }
     }
     // Method to actually draw the component, must be implemented by each component

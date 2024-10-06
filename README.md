@@ -2,15 +2,6 @@
 
 ## Project Status
 
-### Done
-- Navigation
-- File Handling
-- File Status
-
-### Work in Progress
-- Search
-- Syntax Highlighting
-
 ## Overview
 Quik is a terminal-based text editor developed in Rust, designed to provide a minimal yet functional editing experience. Quik implements basic features expected from a text editor, along with enhancements like syntax highlighting and a search functionality.
 
@@ -58,8 +49,10 @@ Once you have Quik running, you can:
   ./target/release/quik myfile.txt
   ```
 
-- Use the arrow keys to navigate and start editing your text.
-- Press `Ctrl + Q` to quit the editor.
+- **Navigation**: Use the arrow keys to move around and start editing your text.
+- **Save**: Press `Ctrl + S` to save your current file.
+- **Find**: Press `Ctrl + F` to search within the document and use the arrow keys to navigate through search results.
+- **Quit**: Press `Ctrl + Q` to quit the editor.
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE.md) file for details.
