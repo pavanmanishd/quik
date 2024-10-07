@@ -12,7 +12,6 @@ Quik is a terminal-based text editor developed in Rust, designed to provide a mi
 
 ## Features
 - **Minimal Interface**: A clean and straightforward interface for efficient text editing.
-- **Syntax Highlighting**: Supports basic syntax highlighting for various programming languages.
 - **Search Functionality**: Allows users to search for specific text within their documents.
 - **Cross-Platform**: Built using Rust, Quik runs on any platform that supports Rust.
 
